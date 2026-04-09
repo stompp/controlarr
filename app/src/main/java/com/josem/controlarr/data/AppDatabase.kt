@@ -38,7 +38,13 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
     }
 }
 
-@Database(entities = [Server::class, Host::class], version = 2, exportSchema = false)
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `servers` ADD COLUMN `sortOrder` INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
+@Database(entities = [Server::class, Host::class], version = 3, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun serverDao(): ServerDao

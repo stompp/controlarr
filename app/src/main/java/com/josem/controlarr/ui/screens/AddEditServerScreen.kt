@@ -1,5 +1,6 @@
 package com.josem.controlarr.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -36,15 +38,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.josem.controlarr.data.ServiceCategory
 import com.josem.controlarr.data.Server
 import com.josem.controlarr.data.ServerType
+import com.josem.controlarr.ui.components.icon
 import com.josem.controlarr.viewmodel.ServerViewModel
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,10 +62,11 @@ fun AddEditServerScreen(
 ) {
     val isEditing = serverId != null
     val hosts by viewModel.hosts.collectAsState()
+    val scope = rememberCoroutineScope()
 
     var name by remember { mutableStateOf("") }
     var selectedType by remember { mutableStateOf(ServerType.SONARR) }
-    var selectedHostId by remember { mutableIntStateOf(preselectedHostId ?: 0) }
+    var addressText by remember { mutableStateOf("") }
     var port by remember { mutableIntStateOf(ServerType.SONARR.defaultPort) }
     var portText by remember { mutableStateOf(ServerType.SONARR.defaultPort.toString()) }
     var apiKey by remember { mutableStateOf("") }
@@ -67,28 +74,48 @@ fun AddEditServerScreen(
     var password by remember { mutableStateOf("") }
     var useHttps by remember { mutableStateOf(false) }
     var typeDropdownExpanded by remember { mutableStateOf(false) }
-    var hostDropdownExpanded by remember { mutableStateOf(false) }
+    var addressDropdownExpanded by remember { mutableStateOf(false) }
     var existingId by remember { mutableIntStateOf(0) }
+    var existingHostId by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(serverId) {
-        if (serverId != null) {
-            viewModel.getServerById(serverId)?.let { server ->
-                existingId = server.id
-                name = server.name
-                selectedType = server.type
-                selectedHostId = server.hostId
-                port = server.port
-                portText = server.port.toString()
-                apiKey = server.apiKey
-                username = server.username
-                password = server.password
-                useHttps = server.useHttps
+    // Pre-fill host address if coming from a host
+    LaunchedEffect(preselectedHostId) {
+        if (preselectedHostId != null && preselectedHostId > 0) {
+            viewModel.getHostById(preselectedHostId)?.let { host ->
+                addressText = host.address
             }
         }
     }
 
-    val selectedHost = hosts.find { it.id == selectedHostId }
-    val isValid = name.isNotBlank() && selectedHostId > 0 && portText.toIntOrNull() != null
+    LaunchedEffect(serverId) {
+        if (serverId != null) {
+            viewModel.getServerWithHostById(serverId)?.let { swh ->
+                existingId = swh.server.id
+                existingHostId = swh.server.hostId
+                name = swh.server.name
+                selectedType = swh.server.type
+                addressText = swh.host.address
+                port = swh.server.port
+                portText = swh.server.port.toString()
+                apiKey = swh.server.apiKey
+                username = swh.server.username
+                password = swh.server.password
+                useHttps = swh.server.useHttps
+            }
+        }
+    }
+
+    // Filter suggestions
+    val addressSuggestions = if (addressText.isBlank()) {
+        hosts
+    } else {
+        hosts.filter {
+            it.address.contains(addressText, ignoreCase = true) ||
+                it.name.contains(addressText, ignoreCase = true)
+        }
+    }
+
+    val isValid = name.isNotBlank() && addressText.isNotBlank() && portText.toIntOrNull() != null
 
     Scaffold(
         topBar = {
@@ -114,38 +141,46 @@ fun AddEditServerScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Host selector
+            // IP / Host field with autocomplete
             ExposedDropdownMenuBox(
-                expanded = hostDropdownExpanded,
-                onExpandedChange = { hostDropdownExpanded = !hostDropdownExpanded }
+                expanded = addressDropdownExpanded && addressSuggestions.isNotEmpty(),
+                onExpandedChange = { addressDropdownExpanded = it }
             ) {
                 OutlinedTextField(
-                    value = selectedHost?.let { "${it.name} (${it.address})" } ?: "Seleccionar dispositivo...",
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Dispositivo *") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = hostDropdownExpanded) },
+                    value = addressText,
+                    onValueChange = {
+                        addressText = it
+                        addressDropdownExpanded = true
+                    },
+                    label = { Text("IP / Hostname *") },
+                    placeholder = { Text("192.168.1.100") },
+                    singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                        .menuAnchor(MenuAnchorType.PrimaryEditable)
                 )
-                ExposedDropdownMenu(
-                    expanded = hostDropdownExpanded,
-                    onDismissRequest = { hostDropdownExpanded = false }
-                ) {
-                    if (hosts.isEmpty()) {
-                        DropdownMenuItem(
-                            text = { Text("No hay dispositivos. Crea uno primero.") },
-                            onClick = { hostDropdownExpanded = false },
-                            enabled = false
-                        )
-                    } else {
-                        hosts.forEach { host ->
+                if (addressSuggestions.isNotEmpty()) {
+                    ExposedDropdownMenu(
+                        expanded = addressDropdownExpanded,
+                        onDismissRequest = { addressDropdownExpanded = false }
+                    ) {
+                        addressSuggestions.forEach { host ->
                             DropdownMenuItem(
-                                text = { Text("${host.name} (${host.address})") },
+                                text = {
+                                    Column {
+                                        Text(host.address)
+                                        if (host.name != host.address) {
+                                            Text(
+                                                host.name,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                },
                                 onClick = {
-                                    selectedHostId = host.id
-                                    hostDropdownExpanded = false
+                                    addressText = host.address
+                                    addressDropdownExpanded = false
                                 }
                             )
                         }
@@ -162,6 +197,7 @@ fun AddEditServerScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
+            // Type selector grouped by category
             ExposedDropdownMenuBox(
                 expanded = typeDropdownExpanded,
                 onExpandedChange = { typeDropdownExpanded = !typeDropdownExpanded }
@@ -171,6 +207,14 @@ fun AddEditServerScreen(
                     onValueChange = {},
                     readOnly = true,
                     label = { Text("Tipo de servicio") },
+                    leadingIcon = {
+                        Icon(
+                            selectedType.icon,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = selectedType.brandColor
+                        )
+                    },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeDropdownExpanded) },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -180,18 +224,42 @@ fun AddEditServerScreen(
                     expanded = typeDropdownExpanded,
                     onDismissRequest = { typeDropdownExpanded = false }
                 ) {
-                    ServerType.entries.forEach { type ->
-                        DropdownMenuItem(
-                            text = { Text(type.displayName) },
-                            onClick = {
-                                selectedType = type
-                                if (!isEditing) {
-                                    port = type.defaultPort
-                                    portText = type.defaultPort.toString()
-                                }
-                                typeDropdownExpanded = false
+                    ServiceCategory.entries.forEach { category ->
+                        val typesInCategory = ServerType.entries.filter { it.category == category }
+                        if (typesInCategory.isNotEmpty()) {
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        category.displayName,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                },
+                                onClick = {},
+                                enabled = false
+                            )
+                            typesInCategory.forEach { type ->
+                                DropdownMenuItem(
+                                    text = { Text("  ${type.displayName}") },
+                                    leadingIcon = {
+                                        Icon(
+                                            type.icon,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(20.dp),
+                                            tint = type.brandColor
+                                        )
+                                    },
+                                    onClick = {
+                                        selectedType = type
+                                        if (!isEditing) {
+                                            port = type.defaultPort
+                                            portText = type.defaultPort.toString()
+                                        }
+                                        typeDropdownExpanded = false
+                                    }
+                                )
                             }
-                        )
+                        }
                     }
                 }
             }
@@ -257,19 +325,26 @@ fun AddEditServerScreen(
 
             Button(
                 onClick = {
-                    val server = Server(
-                        id = if (isEditing) existingId else 0,
-                        name = name.trim(),
-                        type = selectedType,
-                        hostId = selectedHostId,
-                        port = port,
-                        apiKey = apiKey.trim(),
-                        username = username.trim(),
-                        password = password,
-                        useHttps = useHttps
-                    )
-                    viewModel.upsertServer(server)
-                    onNavigateBack()
+                    scope.launch {
+                        val hostId = if (isEditing && addressText == hosts.find { it.id == existingHostId }?.address) {
+                            existingHostId
+                        } else {
+                            viewModel.getOrCreateHostByAddress(addressText.trim())
+                        }
+                        val server = Server(
+                            id = if (isEditing) existingId else 0,
+                            name = name.trim(),
+                            type = selectedType,
+                            hostId = hostId,
+                            port = port,
+                            apiKey = apiKey.trim(),
+                            username = username.trim(),
+                            password = password,
+                            useHttps = useHttps
+                        )
+                        viewModel.upsertServer(server)
+                        onNavigateBack()
+                    }
                 },
                 enabled = isValid,
                 modifier = Modifier.fillMaxWidth()
