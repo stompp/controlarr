@@ -26,7 +26,8 @@ data class Server(
     val apiKey: String = "",
     val username: String = "",
     val password: String = "",
-    val useHttps: Boolean = false
+    val useHttps: Boolean = false,
+    val sortOrder: Int = 0
 ) {
     fun baseUrl(hostAddress: String): String {
         val scheme = if (useHttps) "https" else "http"

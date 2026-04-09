@@ -47,11 +47,32 @@ class ServerViewModel(
 
     suspend fun getServerById(id: Int): Server? = serverDao.getServerById(id)
 
-    suspend fun getServerWithHostById(id: Int): ServerWithHost? = serverDao.getServerWithHostById(id)
+    suspend fun getServerWithHostById(id: Int): ServerWithHost? =
+        serverDao.getServerWithHostById(id)
 
     suspend fun getHostById(id: Int): Host? = hostDao.getHostById(id)
 
     fun getServersByHost(hostId: Int) = serverDao.getServersByHost(hostId)
+
+    /**
+     * Find or create a host by address. Returns the hostId.
+     */
+    suspend fun getOrCreateHostByAddress(address: String): Int {
+        val existing = hosts.value.find {
+            it.address.equals(address, ignoreCase = true)
+        }
+        if (existing != null) return existing.id
+        val newId = hostDao.upsertHost(Host(name = address, address = address))
+        return newId.toInt()
+    }
+
+    fun reorderServers(reorderedList: List<ServerWithHost>) {
+        viewModelScope.launch {
+            reorderedList.forEachIndexed { index, swh ->
+                serverDao.updateSortOrder(swh.server.id, index)
+            }
+        }
+    }
 
     companion object {
         fun factory(serverDao: ServerDao, hostDao: HostDao): ViewModelProvider.Factory =

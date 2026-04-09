@@ -241,6 +241,12 @@ private fun buildAutoLoginJs(
             })();
         """.trimIndent()
 
+        // Plex, Emby, Transmission, Deluge, Portainer, Nextcloud, etc. - generic form login
+        ServerType.PLEX, ServerType.EMBY, ServerType.TRANSMISSION,
+        ServerType.DELUGE, ServerType.SABNZBD, ServerType.NZBGET,
+        ServerType.PORTAINER, ServerType.NGINX_PROXY_MANAGER,
+        ServerType.PIHOLE, ServerType.ADGUARD_HOME, ServerType.GRAFANA,
+        ServerType.NEXTCLOUD, ServerType.UNRAID,
         ServerType.SONARR, ServerType.RADARR, ServerType.PROWLARR,
         ServerType.LIDARR, ServerType.READARR, ServerType.BAZARR,
         ServerType.OVERSEERR, ServerType.TAUTULLI -> """

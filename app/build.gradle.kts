@@ -70,4 +70,7 @@ dependencies {
 
     // WebKit
     implementation("androidx.webkit:webkit:1.12.1")
+
+    // Reorderable (drag & drop for LazyGrid)
+    implementation("sh.calvin.reorderable:reorderable:2.4.0")
 }
