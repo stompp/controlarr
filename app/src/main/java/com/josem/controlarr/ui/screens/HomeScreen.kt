@@ -218,7 +218,7 @@ private fun AllServicesGrid(
                         onClick = { onOpenServer(swh.server.id) },
                         onEdit = { onEditServer(swh.server.id) },
                         onDelete = { viewModel.deleteServer(swh.server) },
-                        dragModifier = Modifier.draggableHandle(
+                        dragModifier = Modifier.longPressDraggableHandle(
                             onDragStopped = {
                                 viewModel.reorderServers(list.toList())
                             }
