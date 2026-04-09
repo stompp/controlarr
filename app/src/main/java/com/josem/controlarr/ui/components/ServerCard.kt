@@ -35,9 +35,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.josem.controlarr.data.Server
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun ServerCard(
     server: Server,
+    hostAddress: String = "",
     onClick: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -94,7 +96,7 @@ fun ServerCard(
             )
 
             Text(
-                text = "${server.host}:${server.port}",
+                text = if (hostAddress.isNotBlank()) "$hostAddress:${server.port}" else ":${server.port}",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
             )

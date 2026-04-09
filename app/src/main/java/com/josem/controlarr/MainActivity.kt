@@ -14,10 +14,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val dao = (application as ControlarrApp).database.serverDao()
+        val db = (application as ControlarrApp).database
         setContent {
             ControlarrTheme {
-                val viewModel: ServerViewModel = viewModel(factory = ServerViewModel.factory(dao))
+                val viewModel: ServerViewModel = viewModel(
+                    factory = ServerViewModel.factory(db.serverDao(), db.hostDao())
+                )
                 val navController = rememberNavController()
                 NavGraph(navController = navController, viewModel = viewModel)
             }
