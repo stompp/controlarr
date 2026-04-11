@@ -10,6 +10,8 @@ import com.josem.controlarr.ui.screens.AddEditServerScreen
 import com.josem.controlarr.ui.screens.HomeScreen
 import com.josem.controlarr.ui.screens.HostServicesScreen
 import com.josem.controlarr.ui.screens.HostsScreen
+import com.josem.controlarr.ui.screens.SecuritySettingsScreen
+import com.josem.controlarr.ui.screens.TokenManagerScreen
 import com.josem.controlarr.ui.screens.WebViewScreen
 import com.josem.controlarr.viewmodel.ServerViewModel
 
@@ -28,7 +30,9 @@ fun NavGraph(
                 onManageHosts = { navController.navigate(Screen.Hosts.route) },
                 onOpenHostServices = { hostId ->
                     navController.navigate(Screen.HostServices.createRoute(hostId))
-                }
+                },
+                onOpenTokenManager = { navController.navigate(Screen.TokenManager.route) },
+                onOpenSecurity = { navController.navigate(Screen.SecuritySettings.route) }
             )
         }
 
@@ -95,6 +99,20 @@ fun NavGraph(
             WebViewScreen(
                 viewModel = viewModel,
                 serverId = serverId,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.TokenManager.route) {
+            TokenManagerScreen(
+                viewModel = viewModel,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.SecuritySettings.route) {
+            SecuritySettingsScreen(
+                encryptedPrefs = viewModel.encryptedPrefs,
                 onNavigateBack = { navController.popBackStack() }
             )
         }

@@ -16,4 +16,6 @@ sealed class Screen(val route: String) {
     data object WebView : Screen("webview/{serverId}") {
         fun createRoute(serverId: Int) = "webview/$serverId"
     }
+    data object TokenManager : Screen("token_manager")
+    data object SecuritySettings : Screen("security_settings")
 }
