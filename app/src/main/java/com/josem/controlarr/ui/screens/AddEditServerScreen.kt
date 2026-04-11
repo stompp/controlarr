@@ -1,6 +1,9 @@
 package com.josem.controlarr.ui.screens
 
-import androidx.compose.foundation.clickable
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,7 +18,11 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -25,6 +32,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -42,6 +50,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -49,6 +58,7 @@ import com.josem.controlarr.data.ServiceCategory
 import com.josem.controlarr.data.Server
 import com.josem.controlarr.data.ServerType
 import com.josem.controlarr.ui.components.icon
+import com.josem.controlarr.viewmodel.ConnectionTestResult
 import com.josem.controlarr.viewmodel.ServerViewModel
 import kotlinx.coroutines.launch
 
@@ -62,7 +72,9 @@ fun AddEditServerScreen(
 ) {
     val isEditing = serverId != null
     val hosts by viewModel.hosts.collectAsState()
+    val connectionResult by viewModel.connectionTestResult.collectAsState()
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     var name by remember { mutableStateOf("") }
     var selectedType by remember { mutableStateOf(ServerType.SONARR) }
@@ -75,10 +87,17 @@ fun AddEditServerScreen(
     var useHttps by remember { mutableStateOf(false) }
     var typeDropdownExpanded by remember { mutableStateOf(false) }
     var addressDropdownExpanded by remember { mutableStateOf(false) }
+    var usernameDropdownExpanded by remember { mutableStateOf(false) }
     var existingId by remember { mutableIntStateOf(0) }
     var existingHostId by remember { mutableIntStateOf(0) }
 
-    // Pre-fill host address if coming from a host
+    val storedUsernames = remember { viewModel.getStoredUsernames() }
+
+    // Clear connection test on exit
+    LaunchedEffect(Unit) {
+        viewModel.clearConnectionTest()
+    }
+
     LaunchedEffect(preselectedHostId) {
         if (preselectedHostId != null && preselectedHostId > 0) {
             viewModel.getHostById(preselectedHostId)?.let { host ->
@@ -105,7 +124,6 @@ fun AddEditServerScreen(
         }
     }
 
-    // Filter suggestions
     val addressSuggestions = if (addressText.isBlank()) {
         hosts
     } else {
@@ -113,6 +131,12 @@ fun AddEditServerScreen(
             it.address.contains(addressText, ignoreCase = true) ||
                 it.name.contains(addressText, ignoreCase = true)
         }
+    }
+
+    val usernameSuggestions = if (username.isBlank()) {
+        storedUsernames.toList()
+    } else {
+        storedUsernames.filter { it.contains(username, ignoreCase = true) }
     }
 
     val isValid = name.isNotBlank() && addressText.isNotBlank() && portText.toIntOrNull() != null
@@ -288,6 +312,56 @@ fun AddEditServerScreen(
                 )
             }
 
+            // Connection test
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        if (addressText.isNotBlank() && portText.toIntOrNull() != null) {
+                            viewModel.testConnection(addressText.trim(), port, useHttps, apiKey.trim())
+                        }
+                    },
+                    enabled = addressText.isNotBlank() && portText.toIntOrNull() != null
+                ) {
+                    Text("Probar conexión")
+                }
+                when (val result = connectionResult) {
+                    is ConnectionTestResult.Testing -> {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                    }
+                    is ConnectionTestResult.Success -> {
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            "OK (${result.statusCode})",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    is ConnectionTestResult.Error -> {
+                        Icon(
+                            Icons.Default.Error,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                        Text(
+                            result.message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            maxLines = 1,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    null -> {}
+                }
+            }
+
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
             Text(
                 text = "Credenciales",
@@ -295,21 +369,40 @@ fun AddEditServerScreen(
                 color = MaterialTheme.colorScheme.primary
             )
 
-            OutlinedTextField(
-                value = apiKey,
-                onValueChange = { apiKey = it },
-                label = { Text("API Key (para servicios *arr)") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            OutlinedTextField(
-                value = username,
-                onValueChange = { username = it },
-                label = { Text("Usuario") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
+            // Username with autocomplete
+            ExposedDropdownMenuBox(
+                expanded = usernameDropdownExpanded && usernameSuggestions.isNotEmpty(),
+                onExpandedChange = { usernameDropdownExpanded = it }
+            ) {
+                OutlinedTextField(
+                    value = username,
+                    onValueChange = {
+                        username = it
+                        usernameDropdownExpanded = true
+                    },
+                    label = { Text("Usuario") },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(MenuAnchorType.PrimaryEditable)
+                )
+                if (usernameSuggestions.isNotEmpty()) {
+                    ExposedDropdownMenu(
+                        expanded = usernameDropdownExpanded,
+                        onDismissRequest = { usernameDropdownExpanded = false }
+                    ) {
+                        usernameSuggestions.forEach { u ->
+                            DropdownMenuItem(
+                                text = { Text(u) },
+                                onClick = {
+                                    username = u
+                                    usernameDropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
 
             OutlinedTextField(
                 value = password,
@@ -318,6 +411,26 @@ fun AddEditServerScreen(
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            // API Key at the end with copy button
+            OutlinedTextField(
+                value = apiKey,
+                onValueChange = { apiKey = it },
+                label = { Text("API Key") },
+                singleLine = true,
+                trailingIcon = {
+                    if (apiKey.isNotBlank()) {
+                        IconButton(onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("apiKey", apiKey))
+                            Toast.makeText(context, "API Key copiada", Toast.LENGTH_SHORT).show()
+                        }) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = "Copiar API Key")
+                        }
+                    }
+                },
                 modifier = Modifier.fillMaxWidth()
             )
 

@@ -23,9 +23,14 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -65,13 +70,16 @@ fun HomeScreen(
     onEditServer: (Int) -> Unit,
     onOpenServer: (Int) -> Unit,
     onManageHosts: () -> Unit,
-    onOpenHostServices: (Int) -> Unit
+    onOpenHostServices: (Int) -> Unit,
+    onOpenTokenManager: () -> Unit,
+    onOpenSecurity: () -> Unit
 ) {
     val serversWithHost by viewModel.serversWithHost.collectAsState()
     val hosts by viewModel.hosts.collectAsState()
     var selectedTab by remember { mutableIntStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
     var showSearch by remember { mutableStateOf(false) }
+    var showOverflowMenu by remember { mutableStateOf(false) }
 
     val filteredServers = if (searchQuery.isBlank()) {
         serversWithHost
@@ -98,6 +106,26 @@ fun HomeScreen(
                     }
                     IconButton(onClick = onManageHosts) {
                         Icon(Icons.Default.Dns, contentDescription = "Dispositivos")
+                    }
+                    Box {
+                        IconButton(onClick = { showOverflowMenu = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "Más opciones")
+                        }
+                        DropdownMenu(
+                            expanded = showOverflowMenu,
+                            onDismissRequest = { showOverflowMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Gestor de tokens") },
+                                leadingIcon = { Icon(Icons.Default.Key, contentDescription = null) },
+                                onClick = { showOverflowMenu = false; onOpenTokenManager() }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Seguridad") },
+                                leadingIcon = { Icon(Icons.Default.Security, contentDescription = null) },
+                                onClick = { showOverflowMenu = false; onOpenSecurity() }
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

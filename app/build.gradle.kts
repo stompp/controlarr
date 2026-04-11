@@ -56,6 +56,7 @@ dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.activity:activity-compose:1.9.3")
+    implementation("androidx.fragment:fragment-ktx:1.8.5")
 
     // Navigation
     implementation("androidx.navigation:navigation-compose:2.8.5")
@@ -73,4 +74,13 @@ dependencies {
 
     // Reorderable (drag & drop for LazyGrid)
     implementation("sh.calvin.reorderable:reorderable:2.4.0")
+
+    // Security (encrypted storage)
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
+    // Biometric
+    implementation("androidx.biometric:biometric:1.1.0")
+
+    // OkHttp (connection testing)
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 }
